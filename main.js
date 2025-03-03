@@ -17,7 +17,10 @@ function createMainWindow() {
         frame: false,
         transparent: true,
         alwaysOnTop: true,
-        resizable: false
+        resizable: false,
+        vibrancy: 'under-window',
+        visualEffectState: 'active',
+        backgroundColor: '#00000000'
     });
 
     mainWindow.loadFile('index.html');
