@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snipping Tool</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #titlebar {
+            -webkit-app-region: drag;
+            height: 32px;
+            background: #2c2c2c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        #title {
+            color: white;
+            font-size: 14px;
+        }
+        .titlebar-buttons {
+            display: flex;
+            gap: 10px;
+            -webkit-app-region: no-drag;
+        }
+        #help-button, #exit-button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+        #help-button:hover {
+            background: #404040;
+        }
+        #exit-button:hover {
+            background: #c42b1c;
+        }
+        #content {
+            padding: 20px;
+        }
+        #image-container {
+            width: 100%;
+            height: 400px;
+            background: rgb(44, 44, 44);
+            margin-bottom: 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #captured-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .button-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        .color-picker-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        .color-picker-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        label {
+            font-size: 14px;
+        }
+        button.action-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button.action-button:hover {
+            background: #45a049;
+        }
+        .circle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            cursor: pointer;
+            user-select: none;
+        }
+        #help-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2c2c2c;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        #help-modal h2 {
+            margin-top: 0;
+        }
+        #help-modal ul {
+            padding-left: 20px;
+        }
+        #help-modal button {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #help-modal button:hover {
+            background: #45a049;
+        }
+        #status-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        #status-message.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="titlebar">
+        <div id="title">Snipping Tool</div>
+        <div class="titlebar-buttons">
+            <button id="help-button">?</button>
+            <button id="exit-button">✕</button>
+        </div>
+    </div>
+    <div id="content">
+        <div id="image-container">
+            <img id="captured-image" style="display: none;">
+        </div>
+        <div class="button-container">
+            <button class="action-button" id="save-button">Save Image</button>
+            <div class="color-picker-container">
+                <div class="color-picker-group">
+                    <label>Circle:</label>
+                    <input type="color" id="circle-color" value="#00ff00">
+                </div>
+                <div class="color-picker-group">
+                    <label>Text:</label>
+                    <input type="color" id="text-color" value="#000000">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="help-modal">
+        <h2>How to Use</h2>
+        <ul>
+            <li>Press Ctrl+Shift+C to start snipping</li>
+            <li>Press Esc to cancel snipping</li>
+            <li>Click on the image to add numbered circles</li>
+            <li>Right-click on a circle to remove it</li>
+            <li>Use color pickers to customize circle and text colors</li>
+            <li>Use Ctrl+C to copy to clipboard</li>
+            <li>Use Ctrl+S or click Save Image button to save to file</li>
+        </ul>
+        <button id="close-help">Close</button>
+    </div>
+    <div id="status-message"></div>
+    <script src="renderer.js"></script>
+</body>
+</html> 

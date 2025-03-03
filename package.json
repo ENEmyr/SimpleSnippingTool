@@ -1,0 +1,19 @@
+{
+  "name": "simple-snipping-tool",
+  "version": "1.0.0",
+  "description": "A snipping tool with annotation capabilities",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  }
+} 
