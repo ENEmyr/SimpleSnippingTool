@@ -29,9 +29,16 @@ logs/
 
 # Application specific
 screenshots/
-*.png
-*.jpg
-*.jpeg
+# Allow etc/ folder but ignore images elsewhere
+/*.png
+/*.jpg
+/*.jpeg
+/screenshots/**/*.png
+/screenshots/**/*.jpg
+/screenshots/**/*.jpeg
+!/etc/**/*.png
+!/etc/**/*.jpg
+!/etc/**/*.jpeg
 
 # Windows specific
 desktop.ini
