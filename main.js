@@ -17,7 +17,9 @@ function createMainWindow() {
         frame: false,
         transparent: true,
         alwaysOnTop: true,
-        resizable: false,
+        resizable: true,
+        minWidth: 400,
+        minHeight: 300,
         vibrancy: 'under-window',
         visualEffectState: 'active',
         backgroundColor: '#00000000'

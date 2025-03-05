@@ -146,7 +146,115 @@ ipcRenderer.on('update-image', async (event, rect) => {
     }
 });
 
-// Update circles display
+// Add zoom and pan variables
+let currentZoom = 1;
+let isPanning = false;
+let startPanX = 0;
+let startPanY = 0;
+let translateX = 0;
+let translateY = 0;
+
+// Add zoom and pan handlers to image container
+const imageContainer = document.getElementById('image-container');
+const capturedImage = document.getElementById('captured-image');
+
+// Zoom handler
+imageContainer.addEventListener('wheel', (event) => {
+    if (event.ctrlKey || event.target.classList.contains('circle')) {
+        // If Ctrl is pressed or we're on a circle, use the existing circle number adjustment logic
+        return;
+    }
+
+    event.preventDefault();
+    const zoomFactor = event.deltaY < 0 ? 1.1 : 0.9;
+    const newZoom = Math.max(0.5, Math.min(5, currentZoom * zoomFactor));
+    
+    // Calculate cursor position relative to image
+    const rect = imageContainer.getBoundingClientRect();
+    const x = event.clientX - rect.left - translateX;
+    const y = event.clientY - rect.top - translateY;
+    
+    // Calculate new translate values to zoom towards cursor
+    translateX += x - (x * (newZoom / currentZoom));
+    translateY += y - (y * (newZoom / currentZoom));
+    
+    currentZoom = newZoom;
+    updateImageTransform();
+    updateCircles();
+});
+
+// Pan handlers
+imageContainer.addEventListener('mousedown', (event) => {
+    // Middle mouse button (button 1)
+    if (event.button === 1 && event.target === capturedImage) {
+        isPanning = true;
+        startPanX = event.clientX - translateX;
+        startPanY = event.clientY - translateY;
+        imageContainer.style.cursor = 'grabbing';
+        event.preventDefault(); // Prevent default middle-click behavior
+    }
+});
+
+document.addEventListener('mousemove', (event) => {
+    if (isPanning) {
+        translateX = event.clientX - startPanX;
+        translateY = event.clientY - startPanY;
+        updateImageTransform();
+        updateCircles();
+    }
+});
+
+document.addEventListener('mouseup', (event) => {
+    if (event.button === 1) {  // Only handle middle button release
+        isPanning = false;
+        imageContainer.style.cursor = 'default';
+    }
+});
+
+// Update image transform
+function updateImageTransform() {
+    if (capturedImage) {
+        capturedImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
+        capturedImage.style.transformOrigin = '0 0';
+    }
+}
+
+// Update click handler to account for zoom and pan
+document.getElementById('image-container').addEventListener('click', (event) => {
+    if (!capturedImageData) return;
+    
+    if (event.target.classList.contains('circle')) {
+        return;
+    }
+    
+    const container = document.getElementById('image-container');
+    const image = document.getElementById('captured-image');
+    const containerRect = container.getBoundingClientRect();
+    
+    // Get the transformed image position
+    const imageRect = image.getBoundingClientRect();
+    
+    // Only allow clicks within the actual image bounds
+    if (event.clientX < imageRect.left || event.clientX > imageRect.right ||
+        event.clientY < imageRect.top || event.clientY > imageRect.bottom) {
+        return;
+    }
+    
+    // Calculate relative position within the container (0 to 1)
+    const relativeX = (event.clientX - imageRect.left) / imageRect.width;
+    const relativeY = (event.clientY - imageRect.top) / imageRect.height;
+    
+    // Store the relative position (this will be used for all future positioning)
+    circles.push({ 
+        relativeX, 
+        relativeY, 
+        number: circles.length + 1 
+    });
+    
+    updateCircles();
+});
+
+// Update the updateCircles function to fix circle positioning
 function updateCircles() {
     const container = document.getElementById('image-container');
     const image = document.getElementById('captured-image');
@@ -162,56 +270,85 @@ function updateCircles() {
     circles.forEach((circle, index) => {
         const circleElement = document.createElement('div');
         circleElement.className = 'circle';
-        circleElement.style.left = `${imageRect.left - container.getBoundingClientRect().left + circle.x - 10}px`;
-        circleElement.style.top = `${imageRect.top - container.getBoundingClientRect().top + circle.y - 10}px`;
+        
+        // Calculate absolute position based on relative position
+        const screenX = imageRect.left + (circle.relativeX * imageRect.width);
+        const screenY = imageRect.top + (circle.relativeY * imageRect.height);
+        
+        // Position circle
+        circleElement.style.position = 'fixed';
+        circleElement.style.left = `${screenX}px`;
+        circleElement.style.top = `${screenY}px`;
+        circleElement.style.transform = `translate(-50%, -50%) scale(${currentZoom})`;
+        circleElement.style.transformOrigin = 'center';
+        
         // Apply current colors
-        circleElement.style.backgroundColor = `${circleColor}80`; // 80 for 50% opacity
+        circleElement.style.backgroundColor = `${circleColor}80`;
         circleElement.style.border = `2px solid ${circleColor}`;
         circleElement.style.color = textColor;
         circleElement.style.fontWeight = 'bold';
-        // Update number to be index + 1 and show total count
-        circleElement.textContent = `${index + 1}`;
+        circleElement.textContent = circle.customNumber || (index + 1);
         
         // Add right-click handler to remove circle
         circleElement.addEventListener('contextmenu', (event) => {
-            event.preventDefault(); // Prevent default context menu
-            circles.splice(index, 1); // Remove the circle from the array
-            // Reset circle counter to match the new total
+            event.preventDefault();
+            circles.splice(index, 1);
             circleCounter = circles.length + 1;
-            updateCircles(); // Redraw circles
+            updateCircles();
             showStatus('Circle removed');
+        });
+
+        // Add wheel event handler to adjust number
+        circleElement.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            
+            if (event.ctrlKey) {
+                const offset = event.deltaY < 0 ? 1 : -1;
+                circles.forEach((c, i) => {
+                    const currentNum = c.customNumber || (i + 1);
+                    c.customNumber = Math.max(1, currentNum + offset);
+                });
+                showStatus(`All numbers ${offset > 0 ? 'increased' : 'decreased'} by 1`);
+            } else {
+                const currentNumber = circle.customNumber || (index + 1);
+                if (event.deltaY < 0) {
+                    circle.customNumber = currentNumber + 1;
+                } else {
+                    circle.customNumber = Math.max(1, currentNumber - 1);
+                }
+            }
+            updateCircles();
         });
         
         container.appendChild(circleElement);
     });
 }
 
-// Handle image container click
-document.getElementById('image-container').addEventListener('click', (event) => {
-    if (!capturedImageData) return;
-    
-    // Ignore if clicking on a circle
-    if (event.target.classList.contains('circle')) {
-        return;
-    }
-    
-    const container = document.getElementById('image-container');
-    const image = document.getElementById('captured-image');
-    const containerRect = container.getBoundingClientRect();
-    const imageRect = image.getBoundingClientRect();
-    
-    // Calculate click position relative to the image
-    const x = event.clientX - imageRect.left;
-    const y = event.clientY - imageRect.top;
-    
-    // Check if click is within image bounds
-    if (x >= 0 && x <= imageRect.width && y >= 0 && y <= imageRect.height) {
-        circles.push({ x, y, number: circles.length + 1 }); // Use length + 1 for new circle number
-        updateCircles();
-    }
-});
+// Update the save and copy functions to use relative positions
+function drawCirclesOnCanvas(context, capturedImage, scale) {
+    circles.forEach((circle, index) => {
+        const x = circle.relativeX * capturedImage.naturalWidth;
+        const y = circle.relativeY * capturedImage.naturalHeight;
+        
+        context.beginPath();
+        context.arc(x, y, 10 * scale, 0, 2 * Math.PI);
+        context.fillStyle = `${circleColor}80`; // 50% opacity
+        context.fill();
+        context.strokeStyle = circleColor;
+        context.lineWidth = 2 * scale;
+        context.stroke();
+        
+        // Use custom number if it exists, otherwise use index + 1
+        const number = circle.customNumber || (index + 1);
+        context.fillStyle = textColor;
+        context.font = `bold ${12 * scale}px Arial`;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(number.toString(), x, y);
+    });
+}
 
-// Handle save button click
+// Update save button click handler
 document.getElementById('save-button').addEventListener('click', () => {
     if (!capturedImageData) return;
     
@@ -225,32 +362,16 @@ document.getElementById('save-button').addEventListener('click', () => {
     // Draw the image
     context.drawImage(capturedImage, 0, 0);
     
-    // Draw circles
+    // Draw circles with custom numbers
     const scale = capturedImage.naturalWidth / capturedImage.clientWidth;
-    circles.forEach((circle, index) => {
-        context.beginPath();
-        context.arc(circle.x * scale, circle.y * scale, 10 * scale, 0, 2 * Math.PI);
-        context.fillStyle = `${circleColor}80`; // 50% opacity
-        context.fill();
-        context.strokeStyle = circleColor;
-        context.lineWidth = 2 * scale;
-        context.stroke();
-        
-        // Draw number with total count
-        context.fillStyle = textColor;
-        context.font = `bold ${12 * scale}px Arial`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(`${index + 1}`, circle.x * scale, circle.y * scale);
-    });
+    drawCirclesOnCanvas(context, capturedImage, scale);
     
     const imageData = canvas.toDataURL('image/png');
     ipcRenderer.send('save-image', imageData);
 });
 
-// Handle copy to clipboard with custom colors
+// Update copy to clipboard handler
 document.addEventListener('keydown', async (event) => {
-    // Handle Ctrl+C (copy to clipboard)
     if (event.ctrlKey && event.key === 'c') {
         if (!capturedImageData) return;
         
@@ -265,24 +386,9 @@ document.addEventListener('keydown', async (event) => {
             // Draw the image
             context.drawImage(capturedImage, 0, 0);
             
-            // Draw circles with custom colors
+            // Draw circles with custom numbers
             const scale = capturedImage.naturalWidth / capturedImage.clientWidth;
-            circles.forEach((circle, index) => {
-                context.beginPath();
-                context.arc(circle.x * scale, circle.y * scale, 10 * scale, 0, 2 * Math.PI);
-                context.fillStyle = `${circleColor}80`; // 50% opacity
-                context.fill();
-                context.strokeStyle = circleColor;
-                context.lineWidth = 2 * scale;
-                context.stroke();
-                
-                // Draw number with total count
-                context.fillStyle = textColor;
-                context.font = `bold ${12 * scale}px Arial`;
-                context.textAlign = 'center';
-                context.textBaseline = 'middle';
-                context.fillText(`${index + 1}`, circle.x * scale, circle.y * scale);
-            });
+            drawCirclesOnCanvas(context, capturedImage, scale);
             
             const imageData = canvas.toDataURL('image/png');
             ipcRenderer.send('copy-to-clipboard', imageData);
