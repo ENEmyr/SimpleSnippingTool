@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, clipboard, dialog, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, clipboard, dialog, desktopCapturer, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -27,22 +27,47 @@ function createMainWindow() {
 }
 
 function createSnippingWindow() {
+    // Get all displays
+    const displays = screen.getAllDisplays();
+
+    // Get the total bounds
+    const totalBounds = {
+        x: Math.min(...displays.map(d => d.bounds.x)),
+        y: Math.min(...displays.map(d => d.bounds.y)),
+        width: Math.max(...displays.map(d => d.bounds.x + d.bounds.width)) - Math.min(...displays.map(d => d.bounds.x)),
+        height: Math.max(...displays.map(d => d.bounds.y + d.bounds.height)) - Math.min(...displays.map(d => d.bounds.y))
+    };
+
     snippingWindow = new BrowserWindow({
-        width: 800,
-        height: 550,
+        x: totalBounds.x,
+        y: totalBounds.y,
+        width: totalBounds.width,
+        height: totalBounds.height,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false
+            contextIsolation: false,
+            enableRemoteModule: true
         },
         frame: false,
         transparent: true,
         alwaysOnTop: true,
-        fullscreen: true,
-        skipTaskbar: true
+        skipTaskbar: true,
+        fullscreen: false,
+        resizable: false,
+        movable: false,
+        hasShadow: false
     });
 
-    snippingWindow.loadFile('snipping.html');
+    // Set the window bounds explicitly to ensure proper positioning
+    snippingWindow.setBounds(totalBounds);
+    
+    // Ensure the window stays in position
+    snippingWindow.setIgnoreMouseEvents(false);
+    snippingWindow.setAlwaysOnTop(true, 'screen-saver');
+    snippingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+    snippingWindow.loadFile('snipping.html');
+    
     // Handle ESC key to cancel snipping
     snippingWindow.webContents.on('before-input-event', (event, input) => {
         if (input.key === 'Escape') {
@@ -83,11 +108,16 @@ ipcMain.on('close-window', () => {
 
 // IPC handlers
 ipcMain.handle('get-screen-source', async () => {
-    const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width: 1, height: 1 }
-    });
-    return sources[0].id;
+    try {
+        const sources = await desktopCapturer.getSources({
+            types: ['screen'],
+            thumbnailSize: { width: 1, height: 1 }
+        });
+        return sources;
+    } catch (error) {
+        console.error('Error getting screen sources:', error);
+        throw error;
+    }
 });
 
 ipcMain.on('capture-area', async (event, rect) => {
@@ -148,4 +178,17 @@ ipcMain.on('copy-to-clipboard', (event, imageData) => {
         console.error('Error copying to clipboard:', error);
         event.reply('copy-error', error.message);
     }
+});
+
+// Add new IPC handler to get display info
+ipcMain.handle('get-displays', () => {
+    return screen.getAllDisplays();
+});
+
+// Add new IPC handler to get window bounds
+ipcMain.handle('get-window-bounds', () => {
+    if (snippingWindow) {
+        return snippingWindow.getBounds();
+    }
+    return null;
 }); 

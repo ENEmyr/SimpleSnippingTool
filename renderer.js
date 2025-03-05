@@ -48,36 +48,83 @@ document.getElementById('text-color').addEventListener('input', (event) => {
 ipcRenderer.on('update-image', async (event, rect) => {
     try {
         // Ensure we wait a moment for any windows to be hidden
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-        const screenSourceId = await ipcRenderer.invoke('get-screen-source');
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: screenSourceId,
-                    minWidth: 1024,
-                    maxWidth: 4000,
-                    minHeight: 768,
-                    maxHeight: 4000
-                }
-            }
+        // Get all screen sources
+        const sources = await ipcRenderer.invoke('get-screen-source');
+        
+        // Get display information
+        const displays = await ipcRenderer.invoke('get-displays');
+
+        // Find the display where the selection was made
+        const selectedDisplay = displays.find(display => 
+            rect.x >= display.bounds.x && 
+            rect.x < display.bounds.x + display.bounds.width &&
+            rect.y >= display.bounds.y && 
+            rect.y < display.bounds.y + display.bounds.height
+        );
+
+        if (!selectedDisplay) {
+            throw new Error('Could not determine which display was selected');
+        }
+
+        // Find the corresponding source for the selected display
+        const selectedSource = sources.find(source => {
+            // Try to match the display with the source
+            // Sources are typically named like "Screen 1" or "Display 1"
+            const displayNumber = displays.indexOf(selectedDisplay) + 1;
+            return source.name.includes(displayNumber.toString());
         });
 
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        await new Promise(resolve => video.onloadedmetadata = resolve);
-        video.play();
+        if (!selectedSource) {
+            throw new Error('Could not find screen source for selected display');
+        }
 
+        // Create a canvas for the capture
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.width = rect.width;
         canvas.height = rect.height;
 
-        context.drawImage(video, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
-        stream.getTracks()[0].stop();
+        // Create stream for the selected screen
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: selectedSource.id,
+                    minWidth: 1024,
+                    maxWidth: 8000,
+                    minHeight: 768,
+                    maxHeight: 8000
+                }
+            }
+        });
 
+        // Create and set up video element
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+        await video.play();
+
+        // Calculate relative coordinates within the selected display
+        const relativeX = rect.x - selectedDisplay.bounds.x;
+        const relativeY = rect.y - selectedDisplay.bounds.y;
+
+        // Capture the selected area
+        context.drawImage(
+            video,
+            relativeX, relativeY,
+            rect.width, rect.height,
+            0, 0,
+            rect.width, rect.height
+        );
+
+        // Clean up
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+
+        // Convert to image and display
         const imageData = canvas.toDataURL('image/png');
         capturedImageData = imageData;
 
@@ -90,11 +137,11 @@ ipcRenderer.on('update-image', async (event, rect) => {
         circleCounter = 1;
         updateCircles();
 
-        // Signal that capture is complete and window can be shown
+        // Signal that capture is complete
         ipcRenderer.send('capture-complete');
     } catch (error) {
         console.error('Error capturing screen:', error);
-        // Show window even if there's an error
+        showStatus('Error capturing screen: ' + error.message, 5000);
         ipcRenderer.send('capture-complete');
     }
 });
