@@ -16,7 +16,6 @@ function createMainWindow() {
         },
         frame: false,
         transparent: true,
-        alwaysOnTop: true,
         resizable: true,
         minWidth: 400,
         minHeight: 300,
@@ -63,7 +62,7 @@ function createSnippingWindow() {
     // Set the window bounds explicitly to ensure proper positioning
     snippingWindow.setBounds(totalBounds);
     
-    // Ensure the window stays in position
+    // Keep only the necessary settings for snipping
     snippingWindow.setIgnoreMouseEvents(false);
     snippingWindow.setAlwaysOnTop(true, 'screen-saver');
     snippingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
