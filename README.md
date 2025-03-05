@@ -80,7 +80,7 @@ Built with:
 
 ## TODO
 
-- Support multiple monitors.
+- ~~Support multiple monitors.~~
 
 ## License
 
