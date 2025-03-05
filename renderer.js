@@ -219,42 +219,15 @@ function updateImageTransform() {
     }
 }
 
-// Update click handler to account for zoom and pan
-document.getElementById('image-container').addEventListener('click', (event) => {
-    if (!capturedImageData) return;
-    
-    if (event.target.classList.contains('circle')) {
-        return;
-    }
-    
-    const container = document.getElementById('image-container');
-    const image = document.getElementById('captured-image');
-    const containerRect = container.getBoundingClientRect();
-    
-    // Get the transformed image position
-    const imageRect = image.getBoundingClientRect();
-    
-    // Only allow clicks within the actual image bounds
-    if (event.clientX < imageRect.left || event.clientX > imageRect.right ||
-        event.clientY < imageRect.top || event.clientY > imageRect.bottom) {
-        return;
-    }
-    
-    // Calculate relative position within the container (0 to 1)
-    const relativeX = (event.clientX - imageRect.left) / imageRect.width;
-    const relativeY = (event.clientY - imageRect.top) / imageRect.height;
-    
-    // Store the relative position (this will be used for all future positioning)
-    circles.push({ 
-        relativeX, 
-        relativeY, 
-        number: circles.length + 1 
-    });
-    
-    updateCircles();
-});
+// Add drag functionality variables
+let isDragging = false;
+let draggedCircle = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let originalX = 0;
+let originalY = 0;
 
-// Update the updateCircles function to fix circle positioning
+// Update the updateCircles function to add drag functionality
 function updateCircles() {
     const container = document.getElementById('image-container');
     const image = document.getElementById('captured-image');
@@ -281,6 +254,7 @@ function updateCircles() {
         circleElement.style.top = `${screenY}px`;
         circleElement.style.transform = `translate(-50%, -50%) scale(${currentZoom})`;
         circleElement.style.transformOrigin = 'center';
+        circleElement.style.cursor = 'move'; // Add move cursor
         
         // Apply current colors
         circleElement.style.backgroundColor = `${circleColor}80`;
@@ -288,6 +262,19 @@ function updateCircles() {
         circleElement.style.color = textColor;
         circleElement.style.fontWeight = 'bold';
         circleElement.textContent = circle.customNumber || (index + 1);
+        
+        // Add drag event handlers
+        circleElement.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left click only
+                isDragging = true;
+                draggedCircle = circle;
+                dragStartX = event.clientX;
+                dragStartY = event.clientY;
+                originalX = circle.relativeX;
+                originalY = circle.relativeY;
+                event.stopPropagation(); // Prevent circle creation
+            }
+        });
         
         // Add right-click handler to remove circle
         circleElement.addEventListener('contextmenu', (event) => {
@@ -323,6 +310,64 @@ function updateCircles() {
         container.appendChild(circleElement);
     });
 }
+
+// Add global mouse move handler for dragging
+document.addEventListener('mousemove', (event) => {
+    if (isDragging && draggedCircle) {
+        const image = document.getElementById('captured-image');
+        const imageRect = image.getBoundingClientRect();
+        
+        // Calculate the drag distance in relative coordinates
+        const deltaX = (event.clientX - dragStartX) / (imageRect.width * currentZoom);
+        const deltaY = (event.clientY - dragStartY) / (imageRect.height * currentZoom);
+        
+        // Update circle position
+        draggedCircle.relativeX = Math.max(0, Math.min(1, originalX + deltaX));
+        draggedCircle.relativeY = Math.max(0, Math.min(1, originalY + deltaY));
+        
+        updateCircles();
+    }
+});
+
+// Add global mouse up handler to stop dragging
+document.addEventListener('mouseup', () => {
+    if (isDragging) {
+        isDragging = false;
+        draggedCircle = null;
+        showStatus('Circle position updated');
+    }
+});
+
+// Update click handler to prevent circle creation while dragging
+document.getElementById('image-container').addEventListener('click', (event) => {
+    if (!capturedImageData || isDragging) return;
+    
+    if (event.target.classList.contains('circle')) {
+        return;
+    }
+    
+    const image = document.getElementById('captured-image');
+    const imageRect = image.getBoundingClientRect();
+    
+    // Only allow clicks within the actual image bounds
+    if (event.clientX < imageRect.left || event.clientX > imageRect.right ||
+        event.clientY < imageRect.top || event.clientY > imageRect.bottom) {
+        return;
+    }
+    
+    // Calculate relative position within the container (0 to 1)
+    const relativeX = (event.clientX - imageRect.left) / imageRect.width;
+    const relativeY = (event.clientY - imageRect.top) / imageRect.height;
+    
+    // Store the relative position (this will be used for all future positioning)
+    circles.push({ 
+        relativeX, 
+        relativeY, 
+        number: circles.length + 1 
+    });
+    
+    updateCircles();
+});
 
 // Update the save and copy functions to use relative positions
 function drawCirclesOnCanvas(context, capturedImage, scale) {
